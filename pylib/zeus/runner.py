@@ -74,6 +74,8 @@ class Runner(PipelineCmdBase):
     super(Runner, cls).Init(parser)
     parser.add_argument('-t', '--timeout', type=float, default=86400,
                         help='Timeout for each task in seconds.')
+    parser.add_argument('-s', '--single-threaded', action='store_true',
+                        help='Run sequentially with all the output dumped to console')
     parser.add_argument('--pool_size', type=int, default=0,
                         help='The pool size for parallelization.')
     parser.add_argument('--detailed_success_mail', action='store_true', default=False,
@@ -146,7 +148,12 @@ class Runner(PipelineCmdBase):
       # Run all the tasks at the same priority in parallel.
       args = zip(itertools.repeat(cls), itertools.repeat('_RunSingeTask'),
                             tasks_to_run)
-      task_res = ExecUtils.ExecuteParallel(args, Flags.ARGS.pool_size)
+      executor = (
+        ExecUtils.ExecuteSequentially
+        if Flags.ARGS.single_threaded
+        else ExecUtils.ExecuteParallel
+      )
+      task_res = executor(args, Flags.ARGS.pool_size)
       # task_res = []
       # for task in tasks_to_run: task_res += [cls._RunSingeTask(task)]
       if not task_res:
@@ -220,10 +227,10 @@ class Runner(PipelineCmdBase):
     TermColor.VInfo(4, 'VARS: \n%s' % task_vars)
 
     task_cmd = task
-    pipe_output = True
+    pipe_output = not Flags.ARGS.single_threaded
     log_file = PipelineUtils.GetLogFileForTask(task)
-    if log_file:
-       task_cmd += ' > ' + PipelineUtils.GetLogFileForTask(task) + ' 2>&1'
+    if not Flags.ARGS.single_threaded and log_file:
+       task_cmd += f' > {log_file} 2>&1'
        pipe_output = False
 
     timeout = cls.__GetTimeOutForTask(task)

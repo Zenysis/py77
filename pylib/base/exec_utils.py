@@ -92,6 +92,34 @@ class ExecUtils:
     return []
 
   @staticmethod
+  def ExecuteSequentially(args, pool_size=0, callback=PicklableCallback()):
+    """Executes a list of methods sequentially. Uses the PicklableCallback
+    as default callback to run individual handlers with the given set of args.
+
+    Args:
+      callback: callable method: A method that can be pickled and called.
+      args: list: List of args to pass to PicklableCallback which in turn calls
+          the callback handler.
+      pool_size: int: The size of the task pool.
+    Return:
+      list: Returns a list of results passed on by the callback handler.
+    """
+    if not args:
+      TermColor.Warning('Nothing to execute.')
+      return []
+
+    try:
+      res = map(callback, args)
+      return res
+    except (KeyboardInterrupt, Exception) as e:
+      TermColor.Error('%s: %s' % (type(e), e))
+      # Pass on the keyboard interrupt.
+      if type(e) == KeyboardInterrupt: raise e
+    finally:
+      sys.stdout.flush()
+    return []
+
+  @staticmethod
   def RunCmd(cmd, timeout_sec=sys.maxsize, piped_output=True, extra_env=None):
     """Executes a command.
     Args:
