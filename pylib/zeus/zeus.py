@@ -6,6 +6,7 @@ __author__ = 'pramodg@room77.com (Pramod Gupta)'
 __copyright__ = 'Copyright 2013 Room77, Inc.'
 
 import argparse
+import os
 import sys
 import time
 
@@ -19,6 +20,46 @@ import pylib.zeus.runner as runner
 
 from pylib.base.flags import Flags
 from pylib.base.term_color import TermColor
+
+
+def find_zeus_executable(current_path):
+  """
+  Find the closest parent directory containing an executable file
+  starting with 'zeus_' and has no extension.
+
+  :return: Path to the executable or None if not found.
+  """
+
+  while True:
+    # Check all files in the current directory
+    for file in os.listdir(current_path):
+      # Check if the file starts with 'zeus_' and has no extension
+      if file.startswith('zeus_') and '.' not in file:
+        file_path = os.path.join(current_path, file)
+        # Check if the file is executable
+        if os.access(file_path, os.X_OK):
+          return file_path
+
+    # Move up to the parent directory
+    current_path = os.path.dirname(current_path)
+
+    # Check if we have reached the root directory
+    if current_path == os.path.dirname(current_path):
+      break
+
+  return None
+
+def execute_and_replace(file_path):
+  """
+  Execute the file at file_path and replace the current process.
+
+  :param file_path: Path to the executable file.
+  """
+  try:
+    os.execv(file_path, [file_path, *sys.argv[1:]])
+  except Exception as e:
+    TermColor.Error(f"Failed to execute {file_path}: {str(e)}")
+
 
 class Zeus(object):
   """Main class to handle all pipeline commands."""
@@ -52,6 +93,26 @@ class Zeus(object):
       parser.set_defaults(func=self._GetHandler(cmd, 'run'))
 
     Flags.InitArgs()
+    if not all((Flags.ARGS.id, Flags.ARGS.root)):
+      if Flags.ARGS.task != ['...']:
+          tasks_dirs = map(
+            lambda t: os.path.abspath(t) if os.path.isdir(t)
+                      else os.path.dirname(os.path.abspath(t)),
+            Flags.ARGS.task
+          )
+          base_dir = os.path.commonpath(tasks_dirs)
+          try:
+            zeus_executable = find_zeus_executable(base_dir)
+          except FileNotFoundError:
+            zeus_executable = None
+      else:
+          zeus_executable = find_zeus_executable(os.getcwd())
+
+      if zeus_executable:
+        print(f'Found Zeus executable at: {zeus_executable}')
+        execute_and_replace(zeus_executable)
+      else:
+        Flags.PARSER.error('--id and --root are required')
 
     # Get the pipeline config instance after all args have been set up.
     pc.PipelineConfig.Instance()

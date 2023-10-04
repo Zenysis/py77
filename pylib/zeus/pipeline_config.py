@@ -13,10 +13,10 @@ from pylib.file.file_utils import FileUtils
 import pylib.util.singleton as singleton
 
 Flags.PARSER.add_argument('--id',
-                          type=str, required=True,
+                          type=str, required=False,
                           help='The id of the pipeline. .e.g "hotel", "suggest", etc.')
 Flags.PARSER.add_argument('--root',
-                          type=str, required=True,
+                          type=str, required=False,
                           help='The root directory specifying the top level of the pipeline.')
 Flags.PARSER.add_argument('--publish_root',
                           type=str, default='',
