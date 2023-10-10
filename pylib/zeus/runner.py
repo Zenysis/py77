@@ -227,7 +227,7 @@ class Runner(PipelineCmdBase):
     TermColor.VInfo(4, 'VARS: \n%s' % task_vars)
 
     task_cmd = task
-    pipe_output = not Flags.ARGS.single_threaded
+    pipe_output = not Flags.ARGS.single_threaded # Print to console for debugging single threaded
     log_file = PipelineUtils.GetLogFileForTask(task)
     if not Flags.ARGS.single_threaded and log_file:
        task_cmd += f' > {log_file} 2>&1'
