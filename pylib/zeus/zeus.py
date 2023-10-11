@@ -112,7 +112,7 @@ class Zeus(object):
         print(f'Found Zeus executable at: {zeus_executable}')
         execute_and_replace(zeus_executable)
       else:
-        Flags.PARSER.error('--id and --root are required')
+        Flags.PARSER.error('--id and --root are required if there\'s no zeus-executable around')
 
     # Get the pipeline config instance after all args have been set up.
     pc.PipelineConfig.Instance()
