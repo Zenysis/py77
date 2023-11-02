@@ -30,15 +30,20 @@ def find_zeus_executable(current_path):
   :return: Path to the executable or None if not found.
   """
 
+  wanted_steps = (None, None)
   while True:
+    wanted_steps = (wanted_steps[1], os.path.basename(os.path.normpath(current_path)))
     # Check all files in the current directory
-    for file in os.listdir(current_path):
-      # Check if the file starts with 'zeus_' and has no extension
-      if file.startswith('zeus_') and '.' not in file:
-        file_path = os.path.join(current_path, file)
-        # Check if the file is executable
-        if os.access(file_path, os.X_OK):
-          return file_path
+    list_dir = frozenset(os.listdir(current_path))
+    for wanted_step in wanted_steps:
+        if wanted_step is None:
+            continue
+        file_name = 'zeus_' + wanted_step
+        if file_name in list_dir:
+            file_path = os.path.join(current_path, file_name)
+            # Check if the file is executable
+            if os.access(file_path, os.X_OK):
+              return file_path
 
     # Move up to the parent directory
     current_path = os.path.dirname(current_path)
