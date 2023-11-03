@@ -4,6 +4,7 @@ __author__ = 'pramodg@room77.com (Pramod Gupta)'
 __copyright__ = 'Copyright 2012 Room77, Inc.'
 
 from collections import deque
+from queue import Queue
 import multiprocessing
 import os
 import signal
@@ -73,10 +74,10 @@ class ExecUtils:
     if not pool_size:
       pool_size = max(multiprocessing.cpu_count(), 1)
 
-    in_queue = multiprocessing.Queue()
+    in_queue = Queue()
     for job in args:
         in_queue.put(job)
-    out_queue = multiprocessing.Queue()
+    out_queue = Queue()
     def worker(in_queue, out_queue):
       while (job := in_queue.get()):
         out_queue.put(callback(job))
