@@ -5,8 +5,11 @@
 __author__ = 'pramodg@room77.com (Pramod Gupta)'
 __copyright__ = 'Copyright 2012 Room77, Inc.'
 
+from collections import defaultdict
+from functools import reduce
 import itertools
 import json
+import operator
 import os
 import re
 import sys
@@ -114,13 +117,25 @@ class Runner(PipelineCmdBase):
     # pipelines do not always have an out dir defined.
     dirs_status = {}
     out_dirs_status = {}
-    for set_tasks in tasks.values():
-      if aborted_task:
-        failed_run += set_tasks
-        continue
 
-      tasks_to_run = []
-      for task in set_tasks:
+    tasks_by_dir = defaultdict(list)
+    for set_tasks in tasks.values():
+        for task in set_tasks:
+            tasks_by_dir[os.path.dirname(task)].append(task)
+
+    key = lambda task: int(os.path.basename(task)[:2])
+    for task_dir in tasks_by_dir:
+        tasks_by_dir[task_dir].sort(key=key)
+    sorted_dirs = sorted(tasks_by_dir, key=key)
+    groupped_dirs = itertools.groupby(
+      sorted_dirs, key=lambda dirname: os.path.basename(dirname)[:2])
+
+    def skip_tasks(tasks_to_run, failed_run, is_aborted):
+      result = []
+      if is_aborted:
+        return result
+
+      for task in tasks_to_run:
         task_options = cls.__GetTaskOptions(task)
         # Check if this task requires all previous tasks in the same directory to be
         # successful.
@@ -131,36 +146,82 @@ class Runner(PipelineCmdBase):
           # of them were successful.
           if cur_dir_status and cur_dir_status != Runner.EXITCODE['SUCCESS']:
             failed_run += [task]
+            done_tasks.add(task)
             task_display_name = PipelineUtils.TaskDisplayName(task)
             TermColor.Info('Skipped   %s' % task_display_name)
             TermColor.Failure(
               'Skipped Task: %s due to earlier failures in task dir' % task_display_name
             )
             continue
+        result.append(task)
+      return result
 
-        tasks_to_run.append(task)
+    def get_tasks_to_run():
+      res = []
+      for tdir, prio in current_prios.items():
+        while (eligible_tasks := {
+          task for task in tasks_by_dir[tdir]
+          if int(os.path.basename(task)[:2]) <= prio
+        }):
+          can_run = eligible_tasks - done_tasks - in_fly
+          if can_run:
+            res.extend(can_run)
+            current_prios[tdir] = prio
+            break
+          elif eligible_tasks.intersection(in_fly):
+            res.extend(can_run - in_fly)
+            break
+          try:
+            prio = sorted({
+                tp for task in tasks_by_dir[tdir]
+                if (tp := int(os.path.basename(task)[:2])) > prio
+            })[0]
+          except IndexError:
+            break
+      return set(res)
 
-      # It is possible for all steps at this priority level to be skipped due to the
-      # task options selected.
-      if set_tasks and not tasks_to_run:
-        continue
 
-      # Run all the tasks at the same priority in parallel.
-      args = zip(itertools.repeat(cls), itertools.repeat('_RunSingeTask'),
-                            tasks_to_run)
-      executor = (
-        ExecUtils.ExecuteSequentially
-        if Flags.ARGS.single_threaded
-        else ExecUtils.ExecuteParallel
-      )
-      task_res = executor(args, Flags.ARGS.pool_size)
-      # task_res = []
-      # for task in tasks_to_run: task_res += [cls._RunSingeTask(task)]
-      if not task_res:
-        TermColor.Error('Could not process: %s' % tasks_to_run)
-        failed_run += tasks_to_run
-        continue
-      for (res, task) in task_res:
+    task_gen = None
+    _, task_dirs = next(groupped_dirs)
+    current_prios = {task_dir: 0 for task_dir in task_dirs}
+    in_fly = set()
+    done_tasks = set()
+    executor = (
+      ExecUtils.ExecuteSequentially
+      if Flags.ARGS.single_threaded
+      else ExecUtils.ExecuteParallel
+    )
+
+    while True:
+      while (
+          not(
+            tasks_to_run := skip_tasks(
+              get_tasks_to_run(), failed_run, bool(aborted_task)
+            )
+          ) and not in_fly):
+        try:
+          _, task_dirs = next(groupped_dirs)
+        except StopIteration:
+          task_gen.send(None)
+          break
+        current_prios = {task_dir: 0 for task_dir in task_dirs}
+
+      if not tasks_to_run and not in_fly:
+        break
+
+      in_fly.update(tasks_to_run)
+
+      if tasks_to_run or in_fly:
+        # Run all the tasks at the same priority in parallel.
+        args = (
+            zip(itertools.repeat(cls), itertools.repeat('_RunSingeTask'), tasks_to_run)
+            if not aborted_task else ()
+        )
+        if not task_gen:
+          task_gen = executor(args, Flags.ARGS.pool_size)
+          res, task = next(task_gen)
+        else:
+          res, task = task_gen.send(args)
         if res == Runner.EXITCODE['SUCCESS']:
           successful_run += [task]
         elif res == Runner.EXITCODE['FAILURE']:
@@ -172,6 +233,10 @@ class Runner(PipelineCmdBase):
           aborted_task = task
         else:
           TermColor.Fatal('Invalid return %d code for %s' % (res, task))
+
+        in_fly.remove(task)
+        done_tasks.add(task)
+        task_dir = os.path.dirname(task)
 
         # Update the current status of all tasks in the same directory.
         task_dir = PipelineUtils.TaskDirName(task)
@@ -185,6 +250,10 @@ class Runner(PipelineCmdBase):
           out_dirs_status[out_dir] = max(
             out_dirs_status.get(out_dir, Runner.EXITCODE['_LOWEST']), res,
           )
+
+    if aborted_task:
+      all_tasks = set(reduce(operator.iadd, tasks.values(), []))
+      failed_run += sorted(all_tasks - done_tasks)
 
     # Write the status files to the dirs.
     cls._WriteOutDirsStatus(out_dirs_status)
