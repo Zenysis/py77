@@ -120,12 +120,12 @@ class Runner(PipelineCmdBase):
 
     tasks_by_dir = defaultdict(list)
     for set_tasks in tasks.values():
-        for task in set_tasks:
-            tasks_by_dir[os.path.dirname(task)].append(task)
+      for task in set_tasks:
+        tasks_by_dir[os.path.dirname(task)].append(task)
 
     key = lambda task: int(os.path.basename(task)[:2])
     for task_dir in tasks_by_dir:
-        tasks_by_dir[task_dir].sort(key=key)
+      tasks_by_dir[task_dir].sort(key=key)
     sorted_dirs = sorted(tasks_by_dir, key=key)
     groupped_dirs = itertools.groupby(
       sorted_dirs, key=lambda dirname: os.path.basename(dirname)[:2])
@@ -157,29 +157,24 @@ class Runner(PipelineCmdBase):
       return result
 
     def get_tasks_to_run():
-      res = []
+      res = set()
       for tdir, prio in current_prios.items():
-        while (eligible_tasks := {
-          task for task in tasks_by_dir[tdir]
-          if int(os.path.basename(task)[:2]) <= prio
-        }):
+        for _, tasks in (
+          (task_prio, tasks)
+          for task_prio, tasks in itertools.groupby(
+            tasks_by_dir[tdir], key=lambda task: int(os.path.basename(task)[:2])
+          ) if task_prio >= prio
+        ):
+          eligible_tasks = set(tasks)
           can_run = eligible_tasks - done_tasks - in_fly
           if can_run:
-            res.extend(can_run)
+            res.update(can_run)
             current_prios[tdir] = prio
             break
-          elif eligible_tasks.intersection(in_fly):
-            res.extend(can_run - in_fly)
+          if eligible_tasks.intersection(in_fly):
+            res.update(can_run - in_fly)
             break
-          try:
-            prio = sorted({
-                tp for task in tasks_by_dir[tdir]
-                if (tp := int(os.path.basename(task)[:2])) > prio
-            })[0]
-          except IndexError:
-            break
-      return set(res)
-
+      return res
 
     task_gen = None
     _, task_dirs = next(groupped_dirs)
