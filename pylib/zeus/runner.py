@@ -131,8 +131,13 @@ class Runner(PipelineCmdBase):
       sorted_dirs, key=lambda dirname: os.path.basename(dirname)[:2])
 
     def skip_tasks(tasks_to_run, failed_run, is_aborted):
+      """
+      Skip tasks that shouldn't run for various reasons, most likely
+      because of failure of the dependencies
+      """
       result = []
       if is_aborted:
+        # whole pipeline is aborted, nothing should be run anymore
         return result
 
       for task in tasks_to_run:
@@ -157,23 +162,33 @@ class Runner(PipelineCmdBase):
       return result
 
     def get_tasks_to_run():
+      """
+      Computes what tasks can now run from the current state.
+      """
       res = set()
       for tdir, prio in current_prios.items():
         for _, tasks in (
           (task_prio, tasks)
           for task_prio, tasks in itertools.groupby(
             tasks_by_dir[tdir], key=lambda task: int(os.path.basename(task)[:2])
-          ) if task_prio >= prio
+          ) if task_prio >= prio  # everything below current prio is done
         ):
           eligible_tasks = set(tasks)
+          # from the tasks with correct prio we aren't interested
+          # in those already done or currently executing
           can_run = eligible_tasks - done_tasks - in_fly
           if can_run:
+            # some tasks can be run, return them and update
+            # current priority
             res.update(can_run)
             current_prios[tdir] = prio
             break
+          # no tasks can be done but we can't jump to the next prio
+          # because there are still tasks running at the current one
           if eligible_tasks.intersection(in_fly):
             res.update(can_run - in_fly)
             break
+          # we're done here, lvl^Wprio up!
       return res
 
     task_gen = None
