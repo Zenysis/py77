@@ -127,8 +127,7 @@ class Runner(PipelineCmdBase):
     for task_dir in tasks_by_dir:
       tasks_by_dir[task_dir].sort(key=key)
     sorted_dirs = sorted(tasks_by_dir, key=key)
-    groupped_dirs = itertools.groupby(
-      sorted_dirs, key=lambda dirname: os.path.basename(dirname)[:2])
+    groupped_dirs = itertools.groupby(sorted_dirs, key=key)
 
     def skip_tasks(tasks_to_run, failed_run, is_aborted):
       """
@@ -169,9 +168,8 @@ class Runner(PipelineCmdBase):
       for tdir, prio in current_prios.items():
         for _, tasks in (
           (task_prio, tasks)
-          for task_prio, tasks in itertools.groupby(
-            tasks_by_dir[tdir], key=lambda task: int(os.path.basename(task)[:2])
-          ) if task_prio >= prio  # everything below current prio is done
+          for task_prio, tasks in itertools.groupby(tasks_by_dir[tdir], key=key)
+          if task_prio >= prio  # everything below current prio is done
         ):
           eligible_tasks = set(tasks)
           # from the tasks with correct prio we aren't interested
