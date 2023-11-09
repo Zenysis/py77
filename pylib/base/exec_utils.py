@@ -56,7 +56,7 @@ class ExecUtils:
 
   @staticmethod
   def ExecuteParallel(*args, **kwargs):
-      return list(ExecUtils.ExecuteParallel(*args, **kwargs))
+      return list(ExecUtils.ExecuteParallelGenerator(*args, **kwargs))
 
   @staticmethod
   def ExecuteParallelGenerator(args, pool_size=0, callback=PicklableCallback()):
