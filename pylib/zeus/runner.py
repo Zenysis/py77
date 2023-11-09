@@ -195,9 +195,9 @@ class Runner(PipelineCmdBase):
     in_fly = set()
     done_tasks = set()
     executor = (
-      ExecUtils.ExecuteSequentially
+      ExecUtils.ExecuteSequentiallyGenerator
       if Flags.ARGS.single_threaded
-      else ExecUtils.ExecuteParallel
+      else ExecUtils.ExecuteParallelGenerator
     )
 
     while True:

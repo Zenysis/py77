@@ -55,7 +55,11 @@ class ExecUtils:
   """Utility class."""
 
   @staticmethod
-  def ExecuteParallel(args, pool_size=0, callback=PicklableCallback()):
+  def ExecuteParallel(*args, **kwargs):
+      return list(ExecUtils.ExecuteParallel(*args, **kwargs))
+
+  @staticmethod
+  def ExecuteParallelGenerator(args, pool_size=0, callback=PicklableCallback()):
     """Executes a list of methods in parallel. Uses the PicklableCallback
     as default callback to run individual handlers with the given set of args.
 
@@ -93,6 +97,7 @@ class ExecUtils:
           break
         for job in new_work:
           in_queue.put(job)
+        sys.stdout.flush()
     except (KeyboardInterrupt, Exception) as e:
       TermColor.Error('%s: %s' % (type(e), e))
       # Pass on the keyboard interrupt.
@@ -104,7 +109,7 @@ class ExecUtils:
       yield None
 
   @staticmethod
-  def ExecuteSequentially(args, pool_size=0, callback=PicklableCallback()):
+  def ExecuteSequentiallyGenerator(args, pool_size=0, callback=PicklableCallback()):
     """Executes a list of methods sequentially. Uses the PicklableCallback
     as default callback to run individual handlers with the given set of args.
 
