@@ -55,8 +55,44 @@ class ExecUtils:
   """Utility class."""
 
   @staticmethod
-  def ExecuteParallel(*args, **kwargs):
-      return list(ExecUtils.ExecuteParallelGenerator(*args, **kwargs))
+  def ExecuteParallel(args, pool_size=0, callback=PicklableCallback()):
+    """Executes a list of methods in parallel. Uses the PicklableCallback
+    as default callback to run individual handlers with the given set of args.
+
+    Args:
+      callback: callable method: A method that can be pickled and called.
+      args: list: List of args to pass to PicklableCallback which in turn calls
+          the callback handler.
+      pool_size: int: The size of the task pool.
+    Return:
+      list: Returns a list of results passed on by the callback handler.
+    """
+    if not args:
+      TermColor.Warning('Nothing to execute.')
+      return []
+
+    if not pool_size:
+      pool_size = max(multiprocessing.cpu_count(), 1)
+
+    # NOTE(stephen): Require use of `fork` for multiprocessing instead of `spawn` since
+    # there are issues with the reuse of some libraries (like Flags) when `spawn` is
+    # used.
+    pool = multiprocessing.get_context('fork').Pool(processes=pool_size)
+    try:
+      res = pool.map(callback, args)
+      pool.terminate()
+      sys.stdout.flush()
+      return res
+    except (KeyboardInterrupt, Exception) as e:
+      TermColor.Error('%s: %s' % (type(e), e))
+      # pool.close()
+      pool.terminate()
+      # Pass on the keyboard interrupt.
+      if type(e) == KeyboardInterrupt: raise e
+
+    sys.stdout.flush()
+    return []
+
 
   @staticmethod
   def ExecuteParallelGenerator(args, pool_size=0, callback=PicklableCallback()):
