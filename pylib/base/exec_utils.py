@@ -3,13 +3,15 @@
 __author__ = 'pramodg@room77.com (Pramod Gupta)'
 __copyright__ = 'Copyright 2012 Room77, Inc.'
 
+from collections import deque
+from queue import Queue
 import multiprocessing
 import os
 import signal
 import subprocess
 import sys
 import shlex
-from threading import Timer
+from threading import Thread, Timer
 
 from pylib.base.term_color import TermColor
 
@@ -91,8 +93,59 @@ class ExecUtils:
     sys.stdout.flush()
     return []
 
+
   @staticmethod
-  def ExecuteSequentially(args, pool_size=0, callback=PicklableCallback()):
+  def ExecuteParallelGenerator(args, pool_size=0, callback=PicklableCallback()):
+    """Executes a list of methods in parallel. Uses the PicklableCallback
+    as default callback to run individual handlers with the given set of args.
+
+    Args:
+      callback: callable method: A method that can be pickled and called.
+      args: list: List of args to pass to PicklableCallback which in turn calls
+          the callback handler.
+      pool_size: int: The size of the task pool.
+    Return:
+      list: Returns a list of results passed on by the callback handler.
+    """
+    if not args:
+      TermColor.Warning('Nothing to execute.')
+      return []
+
+    if not pool_size:
+      pool_size = max(multiprocessing.cpu_count(), 1)
+
+    in_queue = Queue()
+    for job in args:
+        in_queue.put(job)
+    out_queue = Queue()
+    def worker(in_queue, out_queue):
+      while (job := in_queue.get()):
+        out_queue.put(callback(job))
+
+    for _ in range(pool_size):
+      Thread(target=worker, args=(in_queue, out_queue)).start()
+
+    try:
+      while True:
+        res = out_queue.get()
+        new_work = yield res
+        if new_work is None:
+          break
+        for job in new_work:
+          in_queue.put(job)
+        sys.stdout.flush()
+    except (KeyboardInterrupt, Exception) as e:
+      TermColor.Error('%s: %s' % (type(e), e))
+      # Pass on the keyboard interrupt.
+      if type(e) == KeyboardInterrupt: raise e
+    finally:
+      for _ in range(pool_size):
+        in_queue.put(None)
+      sys.stdout.flush()
+      yield None
+
+  @staticmethod
+  def ExecuteSequentiallyGenerator(args, pool_size=0, callback=PicklableCallback()):
     """Executes a list of methods sequentially. Uses the PicklableCallback
     as default callback to run individual handlers with the given set of args.
 
@@ -108,16 +161,19 @@ class ExecUtils:
       TermColor.Warning('Nothing to execute.')
       return []
 
+    queue = deque(args)
     try:
-      res = map(callback, args)
-      return res
+      while queue:
+        job = queue.popleft()
+        new_jobs = yield callback(job)
+        queue.extend(new_jobs or ())
+      yield  # wait for the final sentinel
     except (KeyboardInterrupt, Exception) as e:
       TermColor.Error('%s: %s' % (type(e), e))
       # Pass on the keyboard interrupt.
       if type(e) == KeyboardInterrupt: raise e
     finally:
       sys.stdout.flush()
-    return []
 
   @staticmethod
   def RunCmd(cmd, timeout_sec=sys.maxsize, piped_output=True, extra_env=None):
