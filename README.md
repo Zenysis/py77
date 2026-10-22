@@ -1,8 +1,17 @@
 # Room 77 Python Libraries
 This is a collection of Python libraries used at Room 77, Inc.
 
+This is a fork maintained by Zenysis, since the original
+[room77/py77](https://github.com/room77/py77) is no longer maintained.
+
 ## Installation
-Clone the repo and include its path in your PYTHONPATH
+Install from PyPI:
+
+    pip install zenysis-py77
+
+The package is still imported as `pylib` and installs the `zeus` command.
+
+Alternatively, clone the repo and include its path in your PYTHONPATH
 
 For example:
 

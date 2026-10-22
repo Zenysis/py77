@@ -13,3 +13,6 @@ pipeline/out
 .DS_Store
 ._.DS_Store
 pylib/mail/templates/inline
+build/
+dist/
+*.egg-info/
