@@ -8,7 +8,7 @@ setup(
 
     provides=['pylib'],
 
-    description='Zenysis-maintained fork of the Room 77 Python Libraries (Zeus task runner)',
+    description='Zenysis-maintained fork of the Room 77 Python Libraries',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
 
