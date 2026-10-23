@@ -2,16 +2,21 @@
 from setuptools import find_packages, setup
 
 setup(
-    name='pylib',
-    version='0.2',
+    name='zenysis-py77',
+    version='0.2.1',
     license='MIT',
 
     provides=['pylib'],
 
-    description='Room 77 Python Libraries',
+    description='Zenysis-maintained fork of the Room 77 Python Libraries',
     long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
 
-    url='https://github.com/room77/py77',
+    url='https://github.com/Zenysis/py77',
+    project_urls={
+        'Source': 'https://github.com/Zenysis/py77',
+        'Upstream': 'https://github.com/room77/py77',
+    },
 
     packages=find_packages(),
     data_files=[
