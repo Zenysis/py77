@@ -63,8 +63,11 @@ class PipelineConfig(singleton.Singleton):
     self._pipeline_date = Flags.ARGS.date
 
     # Set the src root.
+    # Resolve symlinks so tasks reached through a symlinked path still sit under the root.
     self._pipeline_base_dir = FileUtils.GetAbsPathForFile(Flags.ARGS.root)
-    if not os.path.isdir(self._pipeline_base_dir):
+    if self._pipeline_base_dir:
+      self._pipeline_base_dir = os.path.realpath(self._pipeline_base_dir)
+    if not self._pipeline_base_dir or not os.path.isdir(self._pipeline_base_dir):
       TermColor.Fatal('Invalid Root directory: %s' % Flags.ARGS.root)
 
     # Set the pipeline specific binary directory, if specified
