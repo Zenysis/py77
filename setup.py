@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='zenysis-py77',
-    version='0.2.1',
+    version='0.2.2',
     license='MIT',
 
     provides=['pylib'],
