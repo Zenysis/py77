@@ -113,7 +113,7 @@ class PipelineCmdBase(object):
       if os.path.basename(target) == '...' :
         target = os.path.dirname(target)
         if not target:
-          target = FileUtils.GetAbsPathForFile(os.getcwd())
+          target = os.path.realpath(os.getcwd())
           if target.find(PipelineConfig.Instance().pipeline_base_dir()) != 0:
             target = PipelineConfig.Instance().pipeline_base_dir()
         recurse = True
@@ -122,6 +122,8 @@ class PipelineCmdBase(object):
       if not abs_target:
         TermColor.Warning('[%s] is not a valid path' % (target))
         continue
+      # Match the symlink-resolved pipeline root (see PipelineConfig).
+      abs_target = os.path.realpath(abs_target)
 
       if os.path.isfile(abs_target):
         cls.__AddFileToTasks(tasks, abs_target)
