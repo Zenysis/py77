@@ -113,7 +113,7 @@ class PipelineCmdBase(object):
       if os.path.basename(target) == '...' :
         target = os.path.dirname(target)
         if not target:
-          target = os.path.realpath(os.getcwd())
+          target = FileUtils.GetAbsPathForFile(os.getcwd())
           if target.find(PipelineConfig.Instance().pipeline_base_dir()) != 0:
             target = PipelineConfig.Instance().pipeline_base_dir()
         recurse = True
@@ -122,8 +122,7 @@ class PipelineCmdBase(object):
       if not abs_target:
         TermColor.Warning('[%s] is not a valid path' % (target))
         continue
-      # Match the symlink-resolved pipeline root (see PipelineConfig).
-      abs_target = os.path.realpath(abs_target)
+      abs_target = cls.__PathUnderRoot(abs_target)
 
       if os.path.isfile(abs_target):
         cls.__AddFileToTasks(tasks, abs_target)
@@ -134,6 +133,33 @@ class PipelineCmdBase(object):
         continue
 
     return cls.__MergeTasks(tasks)
+
+  @classmethod
+  def __PathUnderRoot(cls, path):
+    """Rewrites a path that reaches the pipeline root through a symlink to sit under the root.
+
+    Only the part of the path above the root is resolved. Symlinks below the root, including the
+    task itself, keep their names, since the name relative to the root sets the task's priority
+    and output directories.
+
+    Args:
+      path: string: Absolute path of the target.
+
+    Return:
+      string: The path under the pipeline root, or the input path if no parent resolves to it.
+    """
+    root = PipelineConfig.Instance().pipeline_base_dir()
+    if path == root or path.startswith(root + os.sep):
+      return path
+
+    head, tail = path, []
+    while True:
+      head, part = os.path.split(head)
+      if not part:
+        return path
+      tail.insert(0, part)
+      if os.path.realpath(head) == root:
+        return os.path.join(root, *tail)
 
   @classmethod
   def __AddFileToTasks(cls, tasks, target):
