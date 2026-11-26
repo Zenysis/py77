@@ -152,14 +152,16 @@ class PipelineCmdBase(object):
     if path == root or path.startswith(root + os.sep):
       return path
 
-    head, tail = path, []
+    # Take the outermost parent that resolves to the root, so an alias of the root below it
+    # (e.g. 60_back -> .) keeps its name.
+    head, tail, outermost = path, [], path
     while True:
       head, part = os.path.split(head)
       if not part:
-        return path
+        return outermost
       tail.insert(0, part)
       if os.path.realpath(head) == root:
-        return os.path.join(root, *tail)
+        outermost = os.path.join(root, *tail)
 
   @classmethod
   def __AddFileToTasks(cls, tasks, target):
